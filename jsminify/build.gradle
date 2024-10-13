@@ -1,0 +1,29 @@
+plugins {
+    id 'groovy'
+    id 'groovy-gradle-plugin'
+    id 'maven-publish'
+}
+
+gradlePlugin {
+    plugins {
+        testPlugin {
+            id = 'jsminify'
+            implementationClass = 'net.biberius.gradle.plugin.jsminify.JsMinifyPlugin'
+        }
+    }
+}
+
+dependencies {
+    implementation gradleApi()
+}
+
+publishing {
+    repositories {
+        maven { url "${System.properties['user.home']}/.gradle/plugins" }
+        mavenLocal()
+    }
+}
+
+group = 'net.biberius.gradle.plugin'
+base { archivesName = 'jsminify-plugin' }
+version = '0.1'
