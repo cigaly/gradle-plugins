@@ -6,9 +6,9 @@ plugins {
 
 gradlePlugin {
     plugins {
-        jsminify {
-            id = 'jsminify'
-            implementationClass = 'net.biberius.gradle.plugin.jsminify.JsMinifyPlugin'
+        patch {
+            id = 'patch'
+            implementationClass = 'net.biberius.gradle.plugin.patch.PatchPlugin'
         }
     }
 }
@@ -25,5 +25,5 @@ publishing {
 }
 
 group = 'net.biberius.gradle.plugin'
-base { archivesName = 'jsminify-plugin' }
+base { archivesName = 'patch-plugin' }
 version = '0.1'
