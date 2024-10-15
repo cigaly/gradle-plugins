@@ -1,6 +1,7 @@
 package net.biberius.gradle.plugin.patch
 
 import org.gradle.api.Project
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.Copy
 
@@ -14,26 +15,48 @@ class PatchExtension {
         this.project = project
     }
 
-    def createPatchesTasks(String configuration, List<Map<String, String>> dataList, String patchDir = '') {
-        project.extensions.getByType(JavaPluginExtension).sourceSets.each {
-            it.java { sds -> sds.srcDir(sourcesDir) }
-        }
-        def tasks = project.tasks
-        def provider = tasks.register(configuration)
+    def createPatchesTasks(
+            String configurationName,
+            List<Map<String, String>> dataList,
+            String patchDir = '',
+            Object deps = []
+    ) {
+        apply([
+                'configuration': configurationName,
+                'list'         : dataList,
+                'subdir'       : patchDir,
+                'dependencies' : deps
+        ])
+    }
 
-        def cfg = project.configurations.findByName(configuration)
-        if (cfg == null) {
-            throw new IllegalArgumentException("Non existing configuration '$configuration'")
+    def apply(Map<String, Object> data) {
+        def badKeys = new HashSet<>(data.keySet())
+        badKeys.removeAll(['configuration', 'list', 'subdir', 'dependencies'])
+        if (!badKeys.empty) {
+            throw new IllegalArgumentException("Unknown keys '$badKeys'")
         }
+        String configurationName = data['configuration'] ?: "patch${UUID.randomUUID().toString().replaceAll('-', '')}"
+        project.extensions.getByType(JavaPluginExtension).sourceSets
+                .findByName('main')?.java { sds -> sds.srcDir(sourcesDir) }
+
+        Configuration configuration = project.configurations.maybeCreate(configurationName)
+        configuration.canBeConsumed = false
+        def dependencies = listOfDependencies(data['dependencies'] ?: [])
+        if (!dependencies.empty) {
+            addDependencies(configuration, dependencies)
+        }
+
+        def tasks = project.tasks
+        def provider = tasks.register(configurationName)
 
         def sourceJars = this.project.with {
-            p -> cfg.grep { it.name.indexOf('sources') >= 0 }.collect { p.zipTree(it) }
+            p -> configuration.grep { it.name.indexOf('sources') >= 0 }.collect { p.zipTree(it) }
         }
         if (sourceJars.empty) {
-            throw new IllegalStateException("No sources for configuration '$configuration'")
+            throw new IllegalStateException("No sources for configurationName '$configurationName'")
         }
 
-        dataList.each {
+        data['list'].each {
             def originalFile = it.in
             def mm = (originalFile =~ /^.+\/([^\/]+)\.java$/)
             def baseName
@@ -67,7 +90,7 @@ class PatchExtension {
                 def targetFile = new File(sourcesDir, patchedFile)
                 it.outputs.file targetFile
 
-                File patchFile = new File("$diffsDir/$patchDir", diffFile)
+                File patchFile = new File("$diffsDir/${data['subdir'] ?: ''}", diffFile)
                 it.inputs.file patchFile
                 def original = tasks["extract${baseName}"].outputs.files.iterator().next()
                 it.inputs.dir original
@@ -85,6 +108,36 @@ class PatchExtension {
             }
             provider.get().dependsOn("patch$destBaseName")
         }
-        tasks.named('applyPatches').configure { it.dependsOn(configuration) }
+        tasks.named('applyPatches').configure { it.dependsOn(configurationName) }
+    }
+
+    private static List listOfDependencies(dependencies) {
+        if (dependencies instanceof String || dependencies instanceof GString) {
+            return List.of(dependencies)
+        } else if (dependencies.class.isArray()) {
+            return Arrays.asList(dependencies)
+        }
+        if (!dependencies instanceof Collection) {
+            throw new IllegalArgumentException('Dependencies parameter must be either colelction, or array, or string')
+        }
+        dependencies
+    }
+
+    private Configuration addDependencies(Configuration configuration, List dependencies) {
+        project.dependencies.with { dependencyHandler ->
+            configuration.withDependencies { set ->
+                dependencies.each { dep ->
+                    try {
+                        def dependency = dependencyHandler.create(dep)
+                        set.add(dependency)
+                    } catch (Exception e) {
+                        println e.toString()
+                        println e.message
+                        println dep
+                        throw e
+                    }
+                }
+            }
+        }
     }
 }
