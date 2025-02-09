@@ -19,7 +19,7 @@ dependencies {
 
 publishing {
     repositories {
-        maven { url "${System.properties['user.home']}/.gradle/plugins" }
+        maven { url = "${System.properties['user.home']}/.gradle/plugins" }
         mavenLocal()
     }
 }
