@@ -58,21 +58,26 @@ class PatchExtension {
 
         data['list'].each {
             def originalFile = it.in
-            def mm = (originalFile =~ /^.+\/([^\/]+)\.java$/)
-            def baseName
-            if (mm) {
-                baseName = mm.group(1)
-            } else {
-                throw new IllegalStateException("Not matches: $originalFile")
-            }
-
             def patchedFile = it.out ?: it.in
-            mm = (patchedFile =~ /^.+\/([^\/]+)\.java$/)
             def destBaseName
-            if (mm) {
-                destBaseName = mm.group(1)
+            def baseName
+            if (it.name) {
+                baseName = it.name
+                destBaseName = it.name
             } else {
-                throw new IllegalStateException("Not matches: $patchedFile")
+                def mm = (originalFile =~ /^.+\/([^\/]+)\.java$/)
+                if (mm) {
+                    baseName = mm.group(1)
+                } else {
+                    throw new IllegalStateException("Not matches: $originalFile")
+                }
+
+                mm = (patchedFile =~ /^.+\/([^\/]+)\.java$/)
+                if (mm) {
+                    destBaseName = mm.group(1)
+                } else {
+                    throw new IllegalStateException("Not matches: $patchedFile")
+                }
             }
 
             def diffFile = it.diff ?: "${destBaseName}.java.diff"
