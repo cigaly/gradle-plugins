@@ -59,6 +59,7 @@ class PatchExtension {
         data['list'].each {
             def originalFile = it.in
             def patchedFile = it.out ?: it.in
+            def createFile = it.create ?: false
             def destBaseName
             def baseName
             if (it.name) {
@@ -97,8 +98,14 @@ class PatchExtension {
 
                 File patchFile = new File("$diffsDir/${data['subdir'] ?: ''}", diffFile)
                 it.inputs.file patchFile
-                def original = tasks["extract${baseName}"].outputs.files.iterator().next()
-                it.inputs.dir original
+                def originalInput
+                if (!createFile) {
+                    def original = tasks["extract${baseName}"].outputs.files.iterator().next()
+                    it.inputs.dir original
+                    originalInput = "$original/$originalFile"
+                } else {
+                    originalInput = '__dummy__'
+                }
 
                 sourcesDir.mkdirs()
                 it.doLast {
@@ -106,7 +113,7 @@ class PatchExtension {
                             failonerror: true,
                             backups: false,
                             destfile: targetFile,
-                            originalfile: "$original/$originalFile",
+                            originalfile: originalInput,
                             patchfile: patchFile
                     )
                 }
